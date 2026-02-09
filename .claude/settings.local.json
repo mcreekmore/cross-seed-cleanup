@@ -2,7 +2,6 @@
   "permissions": {
     "allow": [
       "Bash(python:*)",
-      "Bash(set QB_HOST=https://qbit.creekmore.io)",
       "Bash(set:*)",
       "Bash(curl:*)",
       "Bash(git init:*)",
