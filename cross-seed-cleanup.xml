@@ -34,4 +34,5 @@
   <Config Name="SCHEDULE" Target="SCHEDULE" Default="" Mode="{3}" Description="Cron expression for scheduled runs (e.g. '0 */6 * * *' for every 6 hours). If empty, runs once and exits." Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="RUN_ON_START" Target="RUN_ON_START" Default="true" Mode="{3}" Description="Run immediately on container start before entering the cron schedule. Only applies when SCHEDULE is set." Type="Variable" Display="always" Required="false" Mask="false">true</Config>
   <Config Name="DRY_RUN" Target="DRY_RUN" Default="true" Mode="{3}" Description="Set to false to actually apply tags. When true, only reports what would be tagged." Type="Variable" Display="always" Required="false" Mask="false">true</Config>
+  <Config Name="LOG_FILE" Target="LOG_FILE" Default="" Mode="{3}" Description="Path to a log file. If set, output is written to both stdout and this file. Leave empty for stdout only." Type="Variable" Display="always" Required="false" Mask="false"></Config>
 </Container>

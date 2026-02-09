@@ -4,6 +4,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,6 +18,31 @@ import (
 	"github.com/autobrr/go-qbittorrent"
 	"github.com/robfig/cron/v3"
 )
+
+var logger *log.Logger
+
+func initLogger(logFile string) *os.File {
+	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	if logFile == "" {
+		return nil
+	}
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		logError("Failed to open log file %q: %v", logFile, err)
+		return nil
+	}
+	logger.SetOutput(io.MultiWriter(os.Stdout, f))
+	logInfo("Logging to file: %s", logFile)
+	return f
+}
+
+func logInfo(format string, args ...any) {
+	logger.Printf("[INFO]  "+format, args...)
+}
+
+func logError(format string, args ...any) {
+	logger.Printf("[ERROR] "+format, args...)
+}
 
 // inodeKey uniquely identifies a file on a filesystem.
 type inodeKey struct {
@@ -97,20 +124,20 @@ func run() {
 	})
 
 	if err := client.Login(); err != nil {
-		fmt.Println("ERROR: Failed to log in to qBittorrent. Check credentials.")
+		logError("Failed to log in to qBittorrent. Check credentials.")
 		return
 	}
 
 	if version, err := client.GetAppVersion(); err == nil {
-		fmt.Printf("Connected to qBittorrent %s\n", version)
+		logInfo("Connected to qBittorrent %s", version)
 	}
 
 	torrents, err := client.GetTorrents(qbittorrent.TorrentFilterOptions{})
 	if err != nil {
-		fmt.Printf("ERROR: Failed to get torrents: %v\n", err)
+		logError("Failed to get torrents: %v", err)
 		return
 	}
-	fmt.Printf("Total torrents: %d\n", len(torrents))
+	logInfo("Total torrents: %d", len(torrents))
 
 	// ── Phase 1: Stat every file and build inode → torrent hash mapping ─
 
@@ -167,9 +194,9 @@ func run() {
 		}
 	}
 
-	fmt.Printf("\nScanned %d files across %d torrents (%d inaccessible)\n",
-		totalFiles, len(torrents), skipped)
-	fmt.Printf("Unique inodes: %d\n", len(inodeToHashes))
+	fmt.Println() // clear progress line
+	logInfo("Scanned %d files across %d torrents (%d inaccessible)", totalFiles, len(torrents), skipped)
+	logInfo("Unique inodes: %d", len(inodeToHashes))
 
 	// ── Phase 2: Classify each torrent ───────────────────────────────────
 
@@ -243,18 +270,18 @@ func run() {
 
 	// ── Phase 3: Report ──────────────────────────────────────────────────
 
-	fmt.Printf("\n%s\n", strings.Repeat("=", 60))
-	fmt.Printf("  Externally linked (KEEP):        %d\n", len(kept))
-	fmt.Printf("  Cross-seed only (REMOVABLE):     %d\n", len(removable))
-	fmt.Printf("  No accessible files (SKIPPED):   %d\n", len(skippedTorrents))
-	fmt.Printf("%s\n", strings.Repeat("=", 60))
+	logInfo("%s", strings.Repeat("=", 60))
+	logInfo("  Externally linked (KEEP):        %d", len(kept))
+	logInfo("  Cross-seed only (REMOVABLE):     %d", len(removable))
+	logInfo("  No accessible files (SKIPPED):   %d", len(skippedTorrents))
+	logInfo("%s", strings.Repeat("=", 60))
 
 	if len(removable) == 0 {
-		fmt.Println("\nAll torrents with files are externally linked. Nothing to tag.")
+		logInfo("All torrents with files are externally linked. Nothing to tag.")
 		return
 	}
 
-	fmt.Println("\nRemovable torrents (no external hardlinks):\n")
+	logInfo("Removable torrents (no external hardlinks):")
 
 	sort.Slice(removable, func(i, j int) bool {
 		return removable[i].Size > removable[j].Size
@@ -268,11 +295,11 @@ func run() {
 		if t.Category != "" {
 			cat = fmt.Sprintf("[%s]", t.Category)
 		}
-		fmt.Printf("  %8.2f GB  %-20s  %s\n", sizeGB, cat, t.Name)
+		logInfo("  %8.2f GB  %-20s  %s", sizeGB, cat, t.Name)
 	}
 
 	totalGB := float64(totalSize) / (1024 * 1024 * 1024)
-	fmt.Printf("\n  Total reclaimable: %.2f GB\n", totalGB)
+	logInfo("Total reclaimable: %.2f GB", totalGB)
 
 	if !dryRun {
 		hashes := make([]string, len(removable))
@@ -280,19 +307,23 @@ func run() {
 			hashes[i] = t.Hash
 		}
 		if err := client.AddTags(hashes, tagRemovable); err != nil {
-			fmt.Printf("ERROR: Failed to add tags: %v\n", err)
+			logError("Failed to add tags: %v", err)
 		} else {
-			fmt.Printf("\n  Applied tag '%s' to %d torrents.\n", tagRemovable, len(removable))
+			logInfo("Applied tag '%s' to %d torrents.", tagRemovable, len(removable))
 		}
 	} else {
-		fmt.Println("\n  DRY RUN — no changes made. Set DRY_RUN=false to apply tags.")
+		logInfo("DRY RUN — no changes made. Set DRY_RUN=false to apply tags.")
 	}
 }
 
 func main() {
+	if f := initLogger(os.Getenv("LOG_FILE")); f != nil {
+		defer f.Close()
+	}
+
 	// Handle "run" subcommand — always executes once and exits.
 	if len(os.Args) > 1 && os.Args[1] == "run" {
-		fmt.Println("Running cross-seed-cleanup...")
+		logInfo("Running cross-seed-cleanup...")
 		run()
 		return
 	}
@@ -308,32 +339,31 @@ func main() {
 	// ── Cron mode ────────────────────────────────────────────────────────
 	runOnStart := getenvBool("RUN_ON_START", true)
 
-	fmt.Printf("Schedule: %s\n", schedule)
+	logInfo("Schedule: %s", schedule)
 	if runOnStart {
-		fmt.Println("RUN_ON_START=true — executing initial run...")
+		logInfo("RUN_ON_START=true — executing initial run...")
 		run()
-		fmt.Println()
 	}
 
 	c := cron.New()
 	_, err := c.AddFunc(schedule, func() {
-		fmt.Printf("[%s] Scheduled run starting...\n", time.Now().Format(time.DateTime))
+		logInfo("Scheduled run starting...")
 		run()
-		fmt.Printf("[%s] Scheduled run complete.\n\n", time.Now().Format(time.DateTime))
+		logInfo("Scheduled run complete.")
 	})
 	if err != nil {
-		fmt.Printf("ERROR: Invalid SCHEDULE expression %q: %v\n", schedule, err)
+		logError("Invalid SCHEDULE expression %q: %v", schedule, err)
 		os.Exit(1)
 	}
 
 	c.Start()
-	fmt.Printf("Cron scheduler started. Waiting for next run...\n")
+	logInfo("Cron scheduler started. Waiting for next run...")
 
 	// Block until termination signal.
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
 
-	fmt.Println("\nShutting down scheduler...")
+	logInfo("Shutting down scheduler...")
 	c.Stop()
 }
