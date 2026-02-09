@@ -14,6 +14,7 @@ Algorithm:
 
 import os
 import sys
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -34,6 +35,8 @@ TAG_REMOVABLE = os.environ.get("TAG_REMOVABLE", "cross-seed-only")
 EXCLUDE_TAGS = set(filter(None, os.environ.get("EXCLUDE_TAGS", "pinned,keep").split(",")))
 EXCLUDE_CATEGORIES = set(filter(None, os.environ.get("EXCLUDE_CATEGORIES", "").split(",")))
 INCLUDE_CATEGORIES = set(filter(None, os.environ.get("INCLUDE_CATEGORIES", "").split(",")))
+
+MIN_AGE_DAYS = int(os.environ.get("MIN_AGE_DAYS", 0))
 
 DRY_RUN = os.environ.get("DRY_RUN", "true").lower() not in ("false", "0", "no")
 
@@ -103,6 +106,8 @@ def main():
         if EXCLUDE_CATEGORIES and torrent.category in EXCLUDE_CATEGORIES:
             continue
         if INCLUDE_CATEGORIES and torrent.category not in INCLUDE_CATEGORIES:
+            continue
+        if MIN_AGE_DAYS and (time.time() - torrent.added_on) < MIN_AGE_DAYS * 86400:
             continue
 
         has_files = False

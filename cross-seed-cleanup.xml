@@ -30,5 +30,6 @@
   <Config Name="EXCLUDE_TAGS" Target="EXCLUDE_TAGS" Default="pinned,keep" Mode="{3}" Description="Comma-separated tags to skip (torrents with these tags are never marked removable)." Type="Variable" Display="always" Required="false" Mask="false">pinned,keep</Config>
   <Config Name="EXCLUDE_CATEGORIES" Target="EXCLUDE_CATEGORIES" Default="" Mode="{3}" Description="Comma-separated categories to skip entirely." Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="INCLUDE_CATEGORIES" Target="INCLUDE_CATEGORIES" Default="" Mode="{3}" Description="Comma-separated categories to check. If empty, all categories are checked." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="MIN_AGE_DAYS" Target="MIN_AGE_DAYS" Default="0" Mode="{3}" Description="Only tag torrents older than this many days. 0 to disable." Type="Variable" Display="always" Required="false" Mask="false">0</Config>
   <Config Name="DRY_RUN" Target="DRY_RUN" Default="true" Mode="{3}" Description="Set to false to actually apply tags. When true, only reports what would be tagged." Type="Variable" Display="always" Required="false" Mask="false">true</Config>
 </Container>
