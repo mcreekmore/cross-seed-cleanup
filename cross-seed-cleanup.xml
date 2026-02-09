@@ -31,5 +31,7 @@
   <Config Name="EXCLUDE_CATEGORIES" Target="EXCLUDE_CATEGORIES" Default="" Mode="{3}" Description="Comma-separated categories to skip entirely." Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="INCLUDE_CATEGORIES" Target="INCLUDE_CATEGORIES" Default="" Mode="{3}" Description="Comma-separated categories to check. If empty, all categories are checked." Type="Variable" Display="always" Required="false" Mask="false"></Config>
   <Config Name="MIN_AGE_DAYS" Target="MIN_AGE_DAYS" Default="0" Mode="{3}" Description="Only tag torrents older than this many days. 0 to disable." Type="Variable" Display="always" Required="false" Mask="false">0</Config>
+  <Config Name="SCHEDULE" Target="SCHEDULE" Default="" Mode="{3}" Description="Cron expression for scheduled runs (e.g. '0 */6 * * *' for every 6 hours). If empty, runs once and exits." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="RUN_ON_START" Target="RUN_ON_START" Default="true" Mode="{3}" Description="Run immediately on container start before entering the cron schedule. Only applies when SCHEDULE is set." Type="Variable" Display="always" Required="false" Mask="false">true</Config>
   <Config Name="DRY_RUN" Target="DRY_RUN" Default="true" Mode="{3}" Description="Set to false to actually apply tags. When true, only reports what would be tagged." Type="Variable" Display="always" Required="false" Mask="false">true</Config>
 </Container>

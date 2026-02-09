@@ -11,7 +11,9 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(go mod tidy:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(go get:*)",
+      "Bash(GOOS=linux go vet:*)"
     ]
   }
 }
