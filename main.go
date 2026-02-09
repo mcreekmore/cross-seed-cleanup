@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/autobrr/go-qbittorrent"
+	"github.com/robfig/cron/v3"
 )
 
 // inodeKey uniquely identifies a file on a filesystem.
@@ -42,6 +44,20 @@ func getenvInt(key string, fallback int) int {
 	return fallback
 }
 
+func getenvBool(key string, fallback bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	switch strings.ToLower(v) {
+	case "true", "1", "yes":
+		return true
+	case "false", "0", "no":
+		return false
+	}
+	return fallback
+}
+
 func splitSet(s string) map[string]struct{} {
 	set := make(map[string]struct{})
 	for _, v := range strings.Split(s, ",") {
@@ -53,7 +69,7 @@ func splitSet(s string) map[string]struct{} {
 	return set
 }
 
-func main() {
+func run() {
 	// ── Configuration ────────────────────────────────────────────────────
 	qbHost := getenv("QB_HOST", "localhost")
 	qbPort := getenvInt("QB_PORT", 8080)
@@ -82,7 +98,7 @@ func main() {
 
 	if err := client.Login(); err != nil {
 		fmt.Println("ERROR: Failed to log in to qBittorrent. Check credentials.")
-		os.Exit(1)
+		return
 	}
 
 	if version, err := client.GetAppVersion(); err == nil {
@@ -92,7 +108,7 @@ func main() {
 	torrents, err := client.GetTorrents(qbittorrent.TorrentFilterOptions{})
 	if err != nil {
 		fmt.Printf("ERROR: Failed to get torrents: %v\n", err)
-		os.Exit(1)
+		return
 	}
 	fmt.Printf("Total torrents: %d\n", len(torrents))
 
@@ -271,4 +287,53 @@ func main() {
 	} else {
 		fmt.Println("\n  DRY RUN — no changes made. Set DRY_RUN=false to apply tags.")
 	}
+}
+
+func main() {
+	// Handle "run" subcommand — always executes once and exits.
+	if len(os.Args) > 1 && os.Args[1] == "run" {
+		fmt.Println("Running cross-seed-cleanup...")
+		run()
+		return
+	}
+
+	schedule := os.Getenv("SCHEDULE")
+
+	// No schedule configured — single run and exit (backwards compatible).
+	if schedule == "" {
+		run()
+		return
+	}
+
+	// ── Cron mode ────────────────────────────────────────────────────────
+	runOnStart := getenvBool("RUN_ON_START", true)
+
+	fmt.Printf("Schedule: %s\n", schedule)
+	if runOnStart {
+		fmt.Println("RUN_ON_START=true — executing initial run...")
+		run()
+		fmt.Println()
+	}
+
+	c := cron.New()
+	_, err := c.AddFunc(schedule, func() {
+		fmt.Printf("[%s] Scheduled run starting...\n", time.Now().Format(time.DateTime))
+		run()
+		fmt.Printf("[%s] Scheduled run complete.\n\n", time.Now().Format(time.DateTime))
+	})
+	if err != nil {
+		fmt.Printf("ERROR: Invalid SCHEDULE expression %q: %v\n", schedule, err)
+		os.Exit(1)
+	}
+
+	c.Start()
+	fmt.Printf("Cron scheduler started. Waiting for next run...\n")
+
+	// Block until termination signal.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
+
+	fmt.Println("\nShutting down scheduler...")
+	c.Stop()
 }
