@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/mcreekmore/cross-seed-cleanup/actions/workflows/docker-publish.yml"><img src="https://github.com/mcreekmore/cross-seed-cleanup/actions/workflows/docker-publish.yml/badge.svg" alt="Build"></a>
   <a href="https://github.com/mcreekmore/cross-seed-cleanup/releases/latest"><img src="https://img.shields.io/github/v/release/mcreekmore/cross-seed-cleanup" alt="Release"></a>
-  <a href="https://goreportcard.com/badge/github.com/mcreekmore/cross-seed-cleanup"><img src="https://goreportcard.com/badge/github.com/mcreekmore/cross-seed-cleanup" alt="Go Report Card"></a>
+  <a href="https://goreportcard.com/report/github.com/mcreekmore/cross-seed-cleanup"><img src="https://goreportcard.com/badge/github.com/mcreekmore/cross-seed-cleanup" alt="Go Report Card"></a>
   <a href="https://github.com/mcreekmore/cross-seed-cleanup/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
