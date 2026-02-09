@@ -67,6 +67,6 @@ An [Unraid Community Applications](https://github.com/mcreekmore/cross-seed-clea
 
 ## How It Works
 
-1. **Stat** &mdash; Retrieves all torrents from qBittorrent and stats each file to collect inode/hardlink data.
-2. **Classify** &mdash; Compares each file's hardlink count (`nlink`) against the number of torrents referencing the same inode. Files with external hardlinks are kept.
-3. **Tag** &mdash; Torrents with no externally linked files are tagged as removable for bulk deletion in qBittorrent.
+1. **Stat** - Retrieves all torrents from qBittorrent and stats each file to collect inode/hardlink data.
+2. **Classify** - Compares each file's hardlink count (`nlink`) against the number of torrents referencing the same inode. Files with external hardlinks are kept.
+3. **Tag** - Torrents with no externally linked files are tagged as removable for bulk deletion in qBittorrent.
