@@ -48,11 +48,11 @@ Set `DRY_RUN=false` to apply tags.
 
 | Variable             | Default           | Required | Description                                             |
 | -------------------- | ----------------- | -------- | ------------------------------------------------------- |
-| `QB_HOST`            | `localhost`       | No       | qBittorrent Web UI host                                 |
-| `QB_PORT`            | `8080`            | No       | qBittorrent Web UI port                                 |
-| `QB_USERNAME`        | `admin`           | No       | qBittorrent Web UI username                             |
-| `QB_PASSWORD`        |                   | Yes*     | qBittorrent Web UI password                             |
-| `QB_API_KEY`         |                   | Yes*     | qui API key (alternative to username/password)           |
+| `QB_HOST`            | `localhost`       | No       | qBittorrent Web UI host (or qui)                        |
+| `QB_PORT`            | `8080`            | No       | qBittorrent Web UI port (or qui)                        |
+| `QB_USERNAME`        | `admin`           | No       | qBittorrent Web UI username (not needed for qui)        |
+| `QB_PASSWORD`        |                   | Yes*     | qBittorrent Web UI password (not needed for qui)        |
+| `QB_API_KEY`         |                   | Yes*     | qui API key (only needed for qui)                       |
 | `TAG_REMOVABLE`      | `cross-seed-only` | No       | Tag applied to removable torrents                       |
 | `EXCLUDE_TAGS`       | `pinned,keep`     | No       | Tags to skip (comma-separated)                          |
 | `EXCLUDE_CATEGORIES` |                   | No       | Categories to skip (comma-separated)                    |
