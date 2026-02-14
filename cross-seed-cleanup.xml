@@ -25,7 +25,8 @@
   <Config Name="QB_HOST" Target="QB_HOST" Default="localhost" Mode="{3}" Description="qBittorrent Web UI host (IP or hostname)." Type="Variable" Display="always" Required="true" Mask="false">localhost</Config>
   <Config Name="QB_PORT" Target="QB_PORT" Default="8080" Mode="{3}" Description="qBittorrent Web UI port." Type="Variable" Display="always" Required="true" Mask="false">8080</Config>
   <Config Name="QB_USERNAME" Target="QB_USERNAME" Default="admin" Mode="{3}" Description="qBittorrent Web UI username." Type="Variable" Display="always" Required="true" Mask="false">admin</Config>
-  <Config Name="QB_PASSWORD" Target="QB_PASSWORD" Default="" Mode="{3}" Description="qBittorrent Web UI password." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="QB_PASSWORD" Target="QB_PASSWORD" Default="" Mode="{3}" Description="qBittorrent Web UI password. Required unless QB_API_KEY is set." Type="Variable" Display="always" Required="false" Mask="true"></Config>
+  <Config Name="QB_API_KEY" Target="QB_API_KEY" Default="" Mode="{3}" Description="qui API key for proxy authentication. Use this instead of QB_USERNAME/QB_PASSWORD." Type="Variable" Display="always" Required="false" Mask="true"></Config>
   <Config Name="TAG_REMOVABLE" Target="TAG_REMOVABLE" Default="cross-seed-only" Mode="{3}" Description="Tag applied to torrents that can be safely removed." Type="Variable" Display="always" Required="false" Mask="false">cross-seed-only</Config>
   <Config Name="EXCLUDE_TAGS" Target="EXCLUDE_TAGS" Default="pinned,keep" Mode="{3}" Description="Comma-separated tags to skip (torrents with these tags are never marked removable)." Type="Variable" Display="always" Required="false" Mask="false">pinned,keep</Config>
   <Config Name="EXCLUDE_CATEGORIES" Target="EXCLUDE_CATEGORIES" Default="" Mode="{3}" Description="Comma-separated categories to skip entirely." Type="Variable" Display="always" Required="false" Mask="false"></Config>
