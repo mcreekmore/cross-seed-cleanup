@@ -70,11 +70,12 @@ func splitSet(s string) map[string]struct{} {
 }
 
 func run() {
-	// ── Configuration ────────────────────────────────────────────────────
+	// Configuration
 	qbHost := getenv("QB_HOST", "localhost")
 	qbPort := getenvInt("QB_PORT", 8080)
 	qbUsername := getenv("QB_USERNAME", "admin")
 	qbPassword := getenv("QB_PASSWORD", "")
+	qbApiKey := getenv("QB_API_KEY", "")
 
 	tagRemovable := getenv("TAG_REMOVABLE", "cross-seed-only")
 	excludeTags := splitSet(getenv("EXCLUDE_TAGS", "pinned,keep"))
@@ -88,13 +89,26 @@ func run() {
 		dryRun = false
 	}
 
-	// ── Connect ──────────────────────────────────────────────────────────
-	host := fmt.Sprintf("http://%s:%d", qbHost, qbPort)
-	client := qbittorrent.NewClient(qbittorrent.Config{
-		Host:     host,
-		Username: qbUsername,
-		Password: qbPassword,
-	})
+	// Connect
+	var host string
+	var cfg qbittorrent.Config
+
+	if qbApiKey != "" {
+		host = fmt.Sprintf("http://%s:%d/proxy/%s", qbHost, qbPort, qbApiKey)
+		cfg = qbittorrent.Config{
+			Host: host,
+		}
+		fmt.Println("Using qui API key authentication")
+	} else {
+		host = fmt.Sprintf("http://%s:%d", qbHost, qbPort)
+		cfg = qbittorrent.Config{
+			Host:     host,
+			Username: qbUsername,
+			Password: qbPassword,
+		}
+	}
+
+	client := qbittorrent.NewClient(cfg)
 
 	if err := client.Login(); err != nil {
 		fmt.Println("ERROR: Failed to log in to qBittorrent. Check credentials.")
@@ -112,7 +126,7 @@ func run() {
 	}
 	fmt.Printf("Total torrents: %d\n", len(torrents))
 
-	// ── Phase 1: Stat every file and build inode → torrent hash mapping ─
+	// Phase 1: Stat every file and build inode -> torrent hash mapping
 
 	type fileKey struct {
 		Hash  string
@@ -171,7 +185,7 @@ func run() {
 		totalFiles, len(torrents), skipped)
 	fmt.Printf("Unique inodes: %d\n", len(inodeToHashes))
 
-	// ── Phase 2: Classify each torrent ───────────────────────────────────
+	// Phase 2: Classify each torrent
 
 	var removable, kept, skippedTorrents []qbittorrent.Torrent
 	now := time.Now().Unix()
@@ -241,7 +255,7 @@ func run() {
 		}
 	}
 
-	// ── Phase 3: Report ──────────────────────────────────────────────────
+	// Phase 3: Report
 
 	fmt.Printf("\n%s\n", strings.Repeat("=", 60))
 	fmt.Printf("  Externally linked (KEEP):        %d\n", len(kept))
@@ -305,7 +319,7 @@ func main() {
 		return
 	}
 
-	// ── Cron mode ────────────────────────────────────────────────────────
+	// Cron mode
 	runOnStart := getenvBool("RUN_ON_START", true)
 
 	fmt.Printf("Schedule: %s\n", schedule)

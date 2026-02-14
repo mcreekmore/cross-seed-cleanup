@@ -52,6 +52,7 @@ Set `DRY_RUN=false` to apply tags.
 | `QB_PORT`            | `8080`            | qBittorrent Web UI port                                 |
 | `QB_USERNAME`        | `admin`           | qBittorrent Web UI username                             |
 | `QB_PASSWORD`        |                   | qBittorrent Web UI password                             |
+| `QB_API_KEY`         |                   | qui API key (alternative to username/password)           |
 | `TAG_REMOVABLE`      | `cross-seed-only` | Tag applied to removable torrents                       |
 | `EXCLUDE_TAGS`       | `pinned,keep`     | Tags to skip (comma-separated)                          |
 | `EXCLUDE_CATEGORIES` |                   | Categories to skip (comma-separated)                    |
