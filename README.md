@@ -46,20 +46,23 @@ Set `DRY_RUN=false` to apply tags.
 
 ## Configuration
 
-| Variable             | Default           | Description                                             |
-| -------------------- | ----------------- | ------------------------------------------------------- |
-| `QB_HOST`            | `localhost`       | qBittorrent Web UI host                                 |
-| `QB_PORT`            | `8080`            | qBittorrent Web UI port                                 |
-| `QB_USERNAME`        | `admin`           | qBittorrent Web UI username                             |
-| `QB_PASSWORD`        |                   | qBittorrent Web UI password                             |
-| `TAG_REMOVABLE`      | `cross-seed-only` | Tag applied to removable torrents                       |
-| `EXCLUDE_TAGS`       | `pinned,keep`     | Tags to skip (comma-separated)                          |
-| `EXCLUDE_CATEGORIES` |                   | Categories to skip (comma-separated)                    |
-| `INCLUDE_CATEGORIES` |                   | Only process these categories (comma-separated)         |
-| `MIN_AGE_DAYS`       | `0`               | Minimum torrent age in days                             |
-| `DRY_RUN`            | `true`            | Report only; set `false` to apply tags                  |
-| `SCHEDULE`           |                   | Cron expression for recurring runs (e.g. `0 */6 * * *`) |
-| `RUN_ON_START`       | `true`            | Run immediately before entering cron schedule           |
+| Variable             | Default           | Required | Description                                             |
+| -------------------- | ----------------- | -------- | ------------------------------------------------------- |
+| `QB_HOST`            | `localhost`       | No       | qBittorrent Web UI host                                 |
+| `QB_PORT`            | `8080`            | No       | qBittorrent Web UI port                                 |
+| `QB_USERNAME`        | `admin`           | No       | qBittorrent Web UI username                             |
+| `QB_PASSWORD`        |                   | Yes*     | qBittorrent Web UI password                             |
+| `QB_API_KEY`         |                   | Yes*     | qui API key (alternative to username/password)           |
+| `TAG_REMOVABLE`      | `cross-seed-only` | No       | Tag applied to removable torrents                       |
+| `EXCLUDE_TAGS`       | `pinned,keep`     | No       | Tags to skip (comma-separated)                          |
+| `EXCLUDE_CATEGORIES` |                   | No       | Categories to skip (comma-separated)                    |
+| `INCLUDE_CATEGORIES` |                   | No       | Only process these categories (comma-separated)         |
+| `MIN_AGE_DAYS`       | `0`               | No       | Minimum torrent age in days                             |
+| `DRY_RUN`            | `true`            | No       | Report only; set `false` to apply tags                  |
+| `SCHEDULE`           |                   | No       | Cron expression for recurring runs (e.g. `0 */6 * * *`) |
+| `RUN_ON_START`       | `true`            | No       | Run immediately before entering cron schedule           |
+
+\* Provide either `QB_PASSWORD` (with `QB_USERNAME`) or `QB_API_KEY`, not both.
 
 ## Unraid
 
