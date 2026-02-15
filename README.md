@@ -66,7 +66,7 @@ Set `DRY_RUN=false` to apply tags.
 
 ## Unraid
 
-An [Unraid Community Applications](https://github.com/mcreekmore/cross-seed-cleanup) template is included (`cross-seed-cleanup.xml`). Install via the Apps tab or add the template manually.
+An [Unraid Community Applications](https://github.com/mcreekmore/unraid-templates/blob/main/cross-seed-cleanup/cross-seed-cleanup.xml) template is included (`cross-seed-cleanup.xml`). Install via the Apps tab or add the template manually.
 
 ## How It Works
 
