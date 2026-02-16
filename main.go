@@ -268,7 +268,7 @@ func run() {
 		return
 	}
 
-	fmt.Println("\nRemovable torrents (no external hardlinks):\n")
+	fmt.Println("\nRemovable torrents (no external hardlinks):")
 
 	sort.Slice(removable, func(i, j int) bool {
 		return removable[i].Size > removable[j].Size
