@@ -3,6 +3,7 @@
 package main
 
 import (
+	"log/slog"
 	"path/filepath"
 
 	qbittorrent "github.com/autobrr/go-qbittorrent"
@@ -69,6 +70,7 @@ func classifyTorrents(
 			sr, err := statFn(filePath)
 			if err != nil {
 				skippedFiles++
+				slog.Debug("file inaccessible", "path", filePath, "hash", torrent.Hash, "err", err)
 				continue
 			}
 			key := inodeKey{sr.Dev, sr.Ino}
@@ -101,25 +103,30 @@ func classifyTorrents(
 			}
 		}
 		if excluded {
+			slog.Debug("torrent excluded by tag", "name", torrent.Name, "tags", torrent.Tags)
 			continue
 		}
 
 		if len(cfg.ExcludeCategories) > 0 {
 			if _, ok := cfg.ExcludeCategories[torrent.Category]; ok {
+				slog.Debug("torrent excluded by category", "name", torrent.Name, "category", torrent.Category)
 				continue
 			}
 		}
 		if len(cfg.IncludeCategories) > 0 {
 			if _, ok := cfg.IncludeCategories[torrent.Category]; !ok {
+				slog.Debug("torrent skipped, category not included", "name", torrent.Name, "category", torrent.Category)
 				continue
 			}
 		}
 		if cfg.MinAgeDays > 0 && (cfg.Now-torrent.AddedOn) < int64(cfg.MinAgeDays)*86400 {
+			slog.Debug("torrent skipped, below minimum age", "name", torrent.Name, "added_on", torrent.AddedOn)
 			continue
 		}
 
 		files, ok := torrentFiles[torrent.Hash]
 		if !ok {
+			slog.Debug("torrent skipped, no file info", "name", torrent.Name, "hash", torrent.Hash)
 			res.Skipped = append(res.Skipped, torrent)
 			continue
 		}
@@ -141,13 +148,16 @@ func classifyTorrents(
 		}
 
 		if !hasFiles {
+			slog.Debug("torrent skipped, no accessible files", "name", torrent.Name, "hash", torrent.Hash)
 			res.Skipped = append(res.Skipped, torrent)
 			continue
 		}
 
 		if externallyLinked {
+			slog.Debug("torrent kept, externally linked", "name", torrent.Name, "hash", torrent.Hash)
 			res.Kept = append(res.Kept, torrent)
 		} else {
+			slog.Debug("torrent removable, no external links", "name", torrent.Name, "hash", torrent.Hash, "size", torrent.Size)
 			res.Removable = append(res.Removable, torrent)
 		}
 	}
