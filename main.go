@@ -6,71 +6,28 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/autobrr/go-qbittorrent"
+	qbittorrent "github.com/autobrr/go-qbittorrent"
 	"github.com/robfig/cron/v3"
 )
 
-// inodeKey uniquely identifies a file on a filesystem.
-type inodeKey struct {
-	Dev uint64
-	Ino uint64
-}
-
-type statInfo struct {
-	Key   inodeKey
-	Nlink uint64
-}
-
-func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+func realStat(path string) (*StatResult, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
 	}
-	return fallback
-}
-
-func getenvInt(key string, fallback int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
-		}
+	stat, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return nil, fmt.Errorf("unexpected stat type")
 	}
-	return fallback
-}
-
-func getenvBool(key string, fallback bool) bool {
-	v := os.Getenv(key)
-	if v == "" {
-		return fallback
-	}
-	switch strings.ToLower(v) {
-	case "true", "1", "yes":
-		return true
-	case "false", "0", "no":
-		return false
-	}
-	return fallback
-}
-
-func splitSet(s string) map[string]struct{} {
-	set := make(map[string]struct{})
-	for _, v := range strings.Split(s, ",") {
-		v = strings.TrimSpace(v)
-		if v != "" {
-			set[v] = struct{}{}
-		}
-	}
-	return set
+	return &StatResult{Dev: stat.Dev, Ino: stat.Ino, Nlink: stat.Nlink}, nil
 }
 
 func run() {
-	// Configuration
 	qbHost := getenv("QB_HOST", "localhost")
 	qbPort := getenvInt("QB_PORT", 8080)
 	qbUsername := getenv("QB_USERNAME", "admin")
@@ -81,7 +38,6 @@ func run() {
 	excludeTags := splitSet(getenv("EXCLUDE_TAGS", "pinned,keep"))
 	excludeCategories := splitSet(getenv("EXCLUDE_CATEGORIES", ""))
 	includeCategories := splitSet(getenv("INCLUDE_CATEGORIES", ""))
-
 	minAgeDays := getenvInt("MIN_AGE_DAYS", 0)
 
 	dryRun := true
@@ -89,32 +45,23 @@ func run() {
 		dryRun = false
 	}
 
-	// Connect
 	var host string
 	var cfg qbittorrent.Config
 
 	if qbApiKey != "" {
 		host = fmt.Sprintf("http://%s:%d/proxy/%s", qbHost, qbPort, qbApiKey)
-		cfg = qbittorrent.Config{
-			Host: host,
-		}
+		cfg = qbittorrent.Config{Host: host}
 		fmt.Println("Using qui API key authentication")
 	} else {
 		host = fmt.Sprintf("http://%s:%d", qbHost, qbPort)
-		cfg = qbittorrent.Config{
-			Host:     host,
-			Username: qbUsername,
-			Password: qbPassword,
-		}
+		cfg = qbittorrent.Config{Host: host, Username: qbUsername, Password: qbPassword}
 	}
 
 	client := qbittorrent.NewClient(cfg)
-
 	if err := client.Login(); err != nil {
 		fmt.Println("ERROR: Failed to log in to qBittorrent. Check credentials.")
 		return
 	}
-
 	if version, err := client.GetAppVersion(); err == nil {
 		fmt.Printf("Connected to qBittorrent %s\n", version)
 	}
@@ -126,136 +73,35 @@ func run() {
 	}
 	fmt.Printf("Total torrents: %d\n", len(torrents))
 
-	// Phase 1: Stat every file and build inode -> torrent hash mapping
-
-	type fileKey struct {
-		Hash  string
-		Index int
-	}
-
-	inodeToHashes := make(map[inodeKey]map[string]struct{})
-	fileInfoMap := make(map[fileKey]*statInfo)
 	torrentFiles := make(map[string]*qbittorrent.TorrentFiles)
-
-	skipped := 0
-	totalFiles := 0
-
 	for i, torrent := range torrents {
 		if (i+1)%500 == 0 || i+1 == len(torrents) {
-			fmt.Printf("  Scanning torrent %d/%d...\r", i+1, len(torrents))
+			fmt.Printf("  Fetching file info %d/%d...\r", i+1, len(torrents))
 		}
-
 		files, err := client.GetFilesInformation(torrent.Hash)
 		if err != nil {
 			continue
 		}
 		torrentFiles[torrent.Hash] = files
-
-		for _, f := range *files {
-			totalFiles++
-			filePath := filepath.Join(torrent.SavePath, f.Name)
-
-			fi, err := os.Stat(filePath)
-			if err != nil {
-				fileInfoMap[fileKey{torrent.Hash, f.Index}] = nil
-				skipped++
-				continue
-			}
-
-			stat, ok := fi.Sys().(*syscall.Stat_t)
-			if !ok {
-				fileInfoMap[fileKey{torrent.Hash, f.Index}] = nil
-				skipped++
-				continue
-			}
-
-			key := inodeKey{stat.Dev, stat.Ino}
-			if inodeToHashes[key] == nil {
-				inodeToHashes[key] = make(map[string]struct{})
-			}
-			inodeToHashes[key][torrent.Hash] = struct{}{}
-			fileInfoMap[fileKey{torrent.Hash, f.Index}] = &statInfo{
-				Key:   key,
-				Nlink: stat.Nlink,
-			}
-		}
 	}
+	fmt.Println()
 
-	fmt.Printf("\nScanned %d files across %d torrents (%d inaccessible)\n",
-		totalFiles, len(torrents), skipped)
-	fmt.Printf("Unique inodes: %d\n", len(inodeToHashes))
-
-	// Phase 2: Classify each torrent
-
-	var removable, kept, skippedTorrents []qbittorrent.Torrent
-	now := time.Now().Unix()
-
-	for _, torrent := range torrents {
-		// Apply exclusion filters
-		torrentTags := splitSet(torrent.Tags)
-
-		excluded := false
-		for tag := range torrentTags {
-			if _, ok := excludeTags[tag]; ok {
-				excluded = true
-				break
-			}
-		}
-		if excluded {
-			continue
-		}
-
-		if len(excludeCategories) > 0 {
-			if _, ok := excludeCategories[torrent.Category]; ok {
-				continue
-			}
-		}
-		if len(includeCategories) > 0 {
-			if _, ok := includeCategories[torrent.Category]; !ok {
-				continue
-			}
-		}
-		if minAgeDays > 0 && (now-torrent.AddedOn) < int64(minAgeDays)*86400 {
-			continue
-		}
-
-		files, ok := torrentFiles[torrent.Hash]
-		if !ok {
-			skippedTorrents = append(skippedTorrents, torrent)
-			continue
-		}
-
-		hasFiles := false
-		externallyLinked := false
-
-		for _, f := range *files {
-			info := fileInfoMap[fileKey{torrent.Hash, f.Index}]
-			if info == nil {
-				continue
-			}
-
-			hasFiles = true
-			torrentRefs := len(inodeToHashes[info.Key])
-
-			if info.Nlink > uint64(torrentRefs) {
-				externallyLinked = true
-				break
-			}
-		}
-
-		if !hasFiles {
-			skippedTorrents = append(skippedTorrents, torrent)
-			continue
-		}
-
-		if externallyLinked {
-			kept = append(kept, torrent)
-		} else {
-			removable = append(removable, torrent)
-		}
+	fmt.Println("Scanning files...")
+	classCfg := ClassifyConfig{
+		ExcludeTags:       excludeTags,
+		ExcludeCategories: excludeCategories,
+		IncludeCategories: includeCategories,
+		MinAgeDays:        minAgeDays,
+		Now:               time.Now().Unix(),
 	}
+	result := classifyTorrents(torrents, torrentFiles, realStat, classCfg)
 
-	// Phase 3: Report
+	fmt.Printf("Scanned %d files (%d inaccessible)\n", result.TotalFiles, result.SkippedFiles)
+	fmt.Printf("Unique inodes: %d\n", result.UniqueInodes)
+
+	kept := result.Kept
+	removable := result.Removable
+	skippedTorrents := result.Skipped
 
 	fmt.Printf("\n%s\n", strings.Repeat("=", 60))
 	fmt.Printf("  Externally linked (KEEP):        %d\n", len(kept))
@@ -304,7 +150,6 @@ func run() {
 }
 
 func main() {
-	// Handle "run" subcommand — always executes once and exits.
 	if len(os.Args) > 1 && os.Args[1] == "run" {
 		fmt.Println("Running cross-seed-cleanup...")
 		run()
@@ -313,13 +158,11 @@ func main() {
 
 	schedule := os.Getenv("SCHEDULE")
 
-	// No schedule configured — single run and exit (backwards compatible).
 	if schedule == "" {
 		run()
 		return
 	}
 
-	// Cron mode
 	runOnStart := getenvBool("RUN_ON_START", true)
 
 	fmt.Printf("Schedule: %s\n", schedule)
@@ -343,7 +186,6 @@ func main() {
 	c.Start()
 	fmt.Printf("Cron scheduler started. Waiting for next run...\n")
 
-	// Block until termination signal.
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
