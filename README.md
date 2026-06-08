@@ -62,6 +62,7 @@ Set `DRY_RUN=false` to apply tags.
 | `SCHEDULE`           |                   | No       | Cron expression for recurring runs (e.g. `0 */6 * * *`) |
 | `RUN_ON_START`       | `true`            | No       | Run immediately before entering cron schedule           |
 | `LOG_LEVEL`          | `info`            | No       | Log verbosity: `debug`, `info`, `warn`, or `error`      |
+| `LOG_FILE`           |                   | No       | Append report and logs to this file (in addition to stdout) |
 
 \* Provide either `QB_PASSWORD` (with `QB_USERNAME`) or `QB_API_KEY`, not both.
 
