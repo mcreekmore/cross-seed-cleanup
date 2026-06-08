@@ -120,19 +120,17 @@ func run() {
 		return removable[i].Size > removable[j].Size
 	})
 
-	var totalSize int64
 	for _, t := range removable {
-		sizeGB := float64(t.Size) / (1024 * 1024 * 1024)
-		totalSize += t.Size
+		sizeGiB := float64(t.Size) / (1024 * 1024 * 1024)
 		cat := ""
 		if t.Category != "" {
 			cat = fmt.Sprintf("[%s]", t.Category)
 		}
-		fmt.Printf("  %8.2f GB  %-20s  %s\n", sizeGB, cat, t.Name)
+		fmt.Printf("  %8.2f GiB  %-20s  %s\n", sizeGiB, cat, t.Name)
 	}
 
-	totalGB := float64(totalSize) / (1024 * 1024 * 1024)
-	fmt.Printf("\n  Total reclaimable: %.2f GB\n", totalGB)
+	totalGiB := float64(result.ReclaimableBytes) / (1024 * 1024 * 1024)
+	fmt.Printf("\n  Total reclaimable: %.2f GiB\n", totalGiB)
 
 	if !dryRun {
 		hashes := make([]string, len(removable))

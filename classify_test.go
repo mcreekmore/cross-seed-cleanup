@@ -19,17 +19,28 @@ func mkTorrent(hash, savePath, category, tags string, addedOn int64) qbittorrent
 	}
 }
 
-func mkFiles(entries ...struct{ index int; name string }) *qbittorrent.TorrentFiles {
+type fileEntry struct {
+	index int
+	name  string
+	size  int64
+}
+
+func mkFiles(entries ...fileEntry) *qbittorrent.TorrentFiles {
 	f := make(qbittorrent.TorrentFiles, len(entries))
 	for i, e := range entries {
 		f[i].Index = e.index
 		f[i].Name = e.name
+		f[i].Size = e.size
 	}
 	return &f
 }
 
 func oneFile(index int, name string) *qbittorrent.TorrentFiles {
-	return mkFiles(struct{ index int; name string }{index, name})
+	return mkFiles(fileEntry{index, name, 0})
+}
+
+func oneFileSize(index int, name string, size int64) *qbittorrent.TorrentFiles {
+	return mkFiles(fileEntry{index, name, size})
 }
 
 func staticStat(results map[string]*StatResult) func(string) (*StatResult, error) {
@@ -235,6 +246,104 @@ func TestClassify_MultiFile_AnyExternalLinkKeepsTorrent(t *testing.T) {
 
 	if len(res.Kept) != 1 {
 		t.Errorf("expected KEPT (one file externally linked): kept=%d removable=%d", len(res.Kept), len(res.Removable))
+	}
+}
+
+func TestReclaimable_SingleRemovable(t *testing.T) {
+	torrent := mkTorrent("abc", "/data", "", "", 0)
+	files := map[string]*qbittorrent.TorrentFiles{"abc": oneFileSize(0, "movie.mkv", 10_000)}
+	stat := staticStat(map[string]*StatResult{
+		"/data/movie.mkv": {Dev: 1, Ino: 1, Nlink: 1},
+	})
+
+	res := classifyTorrents([]qbittorrent.Torrent{torrent}, files, stat, emptyCfg())
+
+	if res.ReclaimableBytes != 10_000 {
+		t.Errorf("ReclaimableBytes: got %d, want 10000", res.ReclaimableBytes)
+	}
+}
+
+func TestReclaimable_TwoRemovableSameInode_CountsOnce(t *testing.T) {
+	t1 := mkTorrent("hash1", "/data/orig", "", "", 0)
+	t2 := mkTorrent("hash2", "/data/cs", "", "", 0)
+	files := map[string]*qbittorrent.TorrentFiles{
+		"hash1": oneFileSize(0, "movie.mkv", 10_000),
+		"hash2": oneFileSize(0, "movie.mkv", 10_000),
+	}
+	stat := staticStat(map[string]*StatResult{
+		"/data/orig/movie.mkv": {Dev: 1, Ino: 42, Nlink: 2},
+		"/data/cs/movie.mkv":   {Dev: 1, Ino: 42, Nlink: 2},
+	})
+
+	res := classifyTorrents([]qbittorrent.Torrent{t1, t2}, files, stat, emptyCfg())
+
+	if res.ReclaimableBytes != 10_000 {
+		t.Errorf("ReclaimableBytes: got %d, want 10000 (file counted once)", res.ReclaimableBytes)
+	}
+}
+
+func TestReclaimable_RemovableAndKeptSameInode_Zero(t *testing.T) {
+	t1 := mkTorrent("hash1", "/data/orig", "", "", 0)
+	t2 := mkTorrent("hash2", "/data/cs", "", "", 0)
+	files := map[string]*qbittorrent.TorrentFiles{
+		"hash1": oneFileSize(0, "movie.mkv", 10_000),
+		"hash2": oneFileSize(0, "movie.mkv", 10_000),
+	}
+	stat := staticStat(map[string]*StatResult{
+		"/data/orig/movie.mkv": {Dev: 1, Ino: 42, Nlink: 3},
+		"/data/cs/movie.mkv":   {Dev: 1, Ino: 42, Nlink: 3},
+	})
+
+	res := classifyTorrents([]qbittorrent.Torrent{t1, t2}, files, stat, emptyCfg())
+
+	if res.ReclaimableBytes != 0 {
+		t.Errorf("ReclaimableBytes: got %d, want 0 (inode held by kept torrent)", res.ReclaimableBytes)
+	}
+}
+
+func TestReclaimable_ExcludedTorrentHoldsInode_Zero(t *testing.T) {
+	excluded := mkTorrent("hash1", "/data/orig", "", "pinned", 0)
+	removable := mkTorrent("hash2", "/data/cs", "", "", 0)
+	files := map[string]*qbittorrent.TorrentFiles{
+		"hash1": oneFileSize(0, "movie.mkv", 10_000),
+		"hash2": oneFileSize(0, "movie.mkv", 10_000),
+	}
+	stat := staticStat(map[string]*StatResult{
+		"/data/orig/movie.mkv": {Dev: 1, Ino: 42, Nlink: 2},
+		"/data/cs/movie.mkv":   {Dev: 1, Ino: 42, Nlink: 2},
+	})
+
+	cfg := emptyCfg()
+	cfg.ExcludeTags = splitSet("pinned")
+
+	res := classifyTorrents([]qbittorrent.Torrent{excluded, removable}, files, stat, cfg)
+
+	if res.ReclaimableBytes != 0 {
+		t.Errorf("ReclaimableBytes: got %d, want 0 (excluded torrent still holds inode)", res.ReclaimableBytes)
+	}
+}
+
+func TestReclaimable_MultiFile_PartiallyShared(t *testing.T) {
+	cross := mkTorrent("cs", "/data/cs", "", "", 0)
+	keeper := mkTorrent("kp", "/data/kp", "", "", 0)
+	csFiles := mkFiles(
+		fileEntry{0, "shared.mkv", 5_000},
+		fileEntry{1, "unique.mkv", 3_000},
+	)
+	files := map[string]*qbittorrent.TorrentFiles{
+		"cs": csFiles,
+		"kp": oneFileSize(0, "shared.mkv", 5_000),
+	}
+	stat := staticStat(map[string]*StatResult{
+		"/data/cs/shared.mkv": {Dev: 1, Ino: 10, Nlink: 3},
+		"/data/kp/shared.mkv": {Dev: 1, Ino: 10, Nlink: 3},
+		"/data/cs/unique.mkv": {Dev: 1, Ino: 20, Nlink: 1},
+	})
+
+	res := classifyTorrents([]qbittorrent.Torrent{cross, keeper}, files, stat, emptyCfg())
+
+	if res.ReclaimableBytes != 0 {
+		t.Errorf("ReclaimableBytes: got %d, want 0 (cross shares inode with kept torrent)", res.ReclaimableBytes)
 	}
 }
 

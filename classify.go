@@ -33,12 +33,13 @@ type ClassifyConfig struct {
 }
 
 type ClassifyResult struct {
-	Removable    []qbittorrent.Torrent
-	Kept         []qbittorrent.Torrent
-	Skipped      []qbittorrent.Torrent
-	TotalFiles   int
-	SkippedFiles int
-	UniqueInodes int
+	Removable        []qbittorrent.Torrent
+	Kept             []qbittorrent.Torrent
+	Skipped          []qbittorrent.Torrent
+	TotalFiles       int
+	SkippedFiles     int
+	UniqueInodes     int
+	ReclaimableBytes int64
 }
 
 func classifyTorrents(
@@ -53,6 +54,7 @@ func classifyTorrents(
 	}
 
 	inodeToHashes := make(map[inodeKey]map[string]struct{})
+	inodeSizes := make(map[inodeKey]int64)
 	fileInfoMap := make(map[fileKey]*statInfo)
 	var totalFiles, skippedFiles int
 
@@ -72,6 +74,7 @@ func classifyTorrents(
 			key := inodeKey{sr.Dev, sr.Ino}
 			if inodeToHashes[key] == nil {
 				inodeToHashes[key] = make(map[string]struct{})
+				inodeSizes[key] = f.Size
 			}
 			inodeToHashes[key][torrent.Hash] = struct{}{}
 			fileInfoMap[fileKey{torrent.Hash, f.Index}] = &statInfo{
@@ -146,6 +149,23 @@ func classifyTorrents(
 			res.Kept = append(res.Kept, torrent)
 		} else {
 			res.Removable = append(res.Removable, torrent)
+		}
+	}
+
+	removableSet := make(map[string]struct{}, len(res.Removable))
+	for _, t := range res.Removable {
+		removableSet[t.Hash] = struct{}{}
+	}
+	for key, hashes := range inodeToHashes {
+		allRemovable := true
+		for hash := range hashes {
+			if _, ok := removableSet[hash]; !ok {
+				allRemovable = false
+				break
+			}
+		}
+		if allRemovable {
+			res.ReclaimableBytes += inodeSizes[key]
 		}
 	}
 
