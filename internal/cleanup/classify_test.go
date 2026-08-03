@@ -1,6 +1,4 @@
-//go:build linux
-
-package main
+package cleanup
 
 import (
 	"errors"
@@ -53,6 +51,14 @@ func staticStat(results map[string]*StatResult) func(string) (*StatResult, error
 	}
 }
 
+func assertBuckets(t *testing.T, res ClassifyResult, kept, removable, skipped int) {
+	t.Helper()
+	if len(res.Kept) != kept || len(res.Removable) != removable || len(res.Skipped) != skipped {
+		t.Errorf("buckets: got kept=%d removable=%d skipped=%d; want kept=%d removable=%d skipped=%d",
+			len(res.Kept), len(res.Removable), len(res.Skipped), kept, removable, skipped)
+	}
+}
+
 func emptyCfg() ClassifyConfig {
 	return ClassifyConfig{
 		ExcludeTags:       map[string]struct{}{},
@@ -71,8 +77,9 @@ func TestClassify_ExternallyLinked(t *testing.T) {
 
 	res := classifyTorrents([]qbittorrent.Torrent{torrent}, files, stat, emptyCfg())
 
-	if len(res.Kept) != 1 || res.Kept[0].Hash != "abc" {
-		t.Errorf("expected KEPT: kept=%d removable=%d", len(res.Kept), len(res.Removable))
+	assertBuckets(t, res, 1, 0, 0)
+	if res.Kept[0].Hash != "abc" {
+		t.Errorf("expected hash abc in KEPT, got %q", res.Kept[0].Hash)
 	}
 }
 
@@ -85,8 +92,9 @@ func TestClassify_CrossSeedOnly(t *testing.T) {
 
 	res := classifyTorrents([]qbittorrent.Torrent{torrent}, files, stat, emptyCfg())
 
-	if len(res.Removable) != 1 || res.Removable[0].Hash != "abc" {
-		t.Errorf("expected REMOVABLE: kept=%d removable=%d", len(res.Kept), len(res.Removable))
+	assertBuckets(t, res, 0, 1, 0)
+	if res.Removable[0].Hash != "abc" {
+		t.Errorf("expected hash abc in REMOVABLE, got %q", res.Removable[0].Hash)
 	}
 }
 
@@ -104,9 +112,7 @@ func TestClassify_TwoCrossSeedNoExternalLink(t *testing.T) {
 
 	res := classifyTorrents([]qbittorrent.Torrent{t1, t2}, files, stat, emptyCfg())
 
-	if len(res.Removable) != 2 {
-		t.Errorf("expected both REMOVABLE: kept=%d removable=%d", len(res.Kept), len(res.Removable))
-	}
+	assertBuckets(t, res, 0, 2, 0)
 }
 
 func TestClassify_TwoCrossSeedWithExternalLink(t *testing.T) {
@@ -123,9 +129,7 @@ func TestClassify_TwoCrossSeedWithExternalLink(t *testing.T) {
 
 	res := classifyTorrents([]qbittorrent.Torrent{t1, t2}, files, stat, emptyCfg())
 
-	if len(res.Kept) != 2 {
-		t.Errorf("expected both KEPT: kept=%d removable=%d", len(res.Kept), len(res.Removable))
-	}
+	assertBuckets(t, res, 2, 0, 0)
 }
 
 func TestClassify_AllFilesInaccessible(t *testing.T) {
@@ -135,8 +139,9 @@ func TestClassify_AllFilesInaccessible(t *testing.T) {
 
 	res := classifyTorrents([]qbittorrent.Torrent{torrent}, files, stat, emptyCfg())
 
-	if len(res.Skipped) != 1 {
-		t.Errorf("expected SKIPPED: kept=%d removable=%d skipped=%d", len(res.Kept), len(res.Removable), len(res.Skipped))
+	assertBuckets(t, res, 0, 0, 1)
+	if res.TotalFiles != 1 || res.SkippedFiles != 1 {
+		t.Errorf("counters: got total=%d skipped=%d; want total=1 skipped=1", res.TotalFiles, res.SkippedFiles)
 	}
 }
 
@@ -146,9 +151,7 @@ func TestClassify_NoFilesEntry(t *testing.T) {
 
 	res := classifyTorrents([]qbittorrent.Torrent{torrent}, map[string]*qbittorrent.TorrentFiles{}, stat, emptyCfg())
 
-	if len(res.Skipped) != 1 {
-		t.Errorf("expected SKIPPED: kept=%d removable=%d skipped=%d", len(res.Kept), len(res.Removable), len(res.Skipped))
-	}
+	assertBuckets(t, res, 0, 0, 1)
 }
 
 func TestClassify_ExcludeByTag(t *testing.T) {
@@ -209,24 +212,30 @@ func TestClassify_IncludeFilter(t *testing.T) {
 func TestClassify_MinAgeDays(t *testing.T) {
 	const now = int64(1_000_000)
 	recent := mkTorrent("recent", "/data", "", "", now-86400*3)
+	boundary := mkTorrent("boundary", "/data", "", "", now-86400*7)
 	old := mkTorrent("old", "/data", "", "", now-86400*10)
 	files := map[string]*qbittorrent.TorrentFiles{
-		"recent": oneFile(0, "new.mkv"),
-		"old":    oneFile(0, "old.mkv"),
+		"recent":   oneFile(0, "new.mkv"),
+		"boundary": oneFile(0, "boundary.mkv"),
+		"old":      oneFile(0, "old.mkv"),
 	}
 	stat := staticStat(map[string]*StatResult{
-		"/data/new.mkv": {Dev: 1, Ino: 1, Nlink: 1},
-		"/data/old.mkv": {Dev: 1, Ino: 2, Nlink: 1},
+		"/data/new.mkv":      {Dev: 1, Ino: 1, Nlink: 1},
+		"/data/boundary.mkv": {Dev: 1, Ino: 2, Nlink: 1},
+		"/data/old.mkv":      {Dev: 1, Ino: 3, Nlink: 1},
 	})
 
 	cfg := emptyCfg()
 	cfg.Now = now
 	cfg.MinAgeDays = 7
 
-	res := classifyTorrents([]qbittorrent.Torrent{recent, old}, files, stat, cfg)
+	res := classifyTorrents([]qbittorrent.Torrent{recent, boundary, old}, files, stat, cfg)
 
-	if len(res.Removable) != 1 || res.Removable[0].Hash != "old" {
-		t.Errorf("expected only 'old' processed: kept=%d removable=%d", len(res.Kept), len(res.Removable))
+	assertBuckets(t, res, 0, 2, 0)
+	for _, tr := range res.Removable {
+		if tr.Hash == "recent" {
+			t.Error("recent torrent (below MinAgeDays) should not be processed")
+		}
 	}
 }
 
@@ -244,9 +253,7 @@ func TestClassify_MultiFile_AnyExternalLinkKeepsTorrent(t *testing.T) {
 
 	res := classifyTorrents([]qbittorrent.Torrent{torrent}, files, stat, emptyCfg())
 
-	if len(res.Kept) != 1 {
-		t.Errorf("expected KEPT (one file externally linked): kept=%d removable=%d", len(res.Kept), len(res.Removable))
-	}
+	assertBuckets(t, res, 1, 0, 0)
 }
 
 func TestReclaimable_SingleRemovable(t *testing.T) {
