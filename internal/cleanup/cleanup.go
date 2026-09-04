@@ -121,12 +121,6 @@ func Run() {
 	removable := result.Removable
 	skippedTorrents := result.Skipped
 
-	slog.Info("classification summary",
-		"kept", len(kept),
-		"removable", len(removable),
-		"skipped", len(skippedTorrents),
-	)
-
 	if len(removable) == 0 {
 		slog.Info("all torrents with files are externally linked, nothing to tag")
 		return
@@ -138,12 +132,18 @@ func Run() {
 
 	for _, t := range removable {
 		sizeGiB := float64(t.Size) / (1024 * 1024 * 1024)
-		slog.Info("removable torrent",
+		slog.Debug("removable torrent",
 			"size_gib", fmt.Sprintf("%.2f", sizeGiB),
 			"category", t.Category,
 			"name", t.Name,
 		)
 	}
+
+	slog.Info("classification summary",
+		"kept", len(kept),
+		"removable", len(removable),
+		"skipped", len(skippedTorrents),
+	)
 
 	totalGiB := float64(result.ReclaimableBytes) / (1024 * 1024 * 1024)
 	slog.Info("reclaimable space", "total_gib", fmt.Sprintf("%.2f", totalGiB))
