@@ -66,6 +66,13 @@ Set `DRY_RUN=false` to apply tags.
 
 \* Provide either `QB_PASSWORD` (with `QB_USERNAME`) or `QB_API_KEY`, not both.
 
+### Volumes
+
+| Container Path | Mode | Description                                                                     |
+| -------------- | ---- | ------------------------------------------------------------------------------- |
+| `/data`        | `ro` | Torrent data. Must match the paths qBittorrent uses.                            |
+| `/logs`        | `rw` | Optional. Folder for log files; point `LOG_FILE` here (e.g. `/logs/cross-seed-cleanup.log`) to persist logs. |
+
 ## Unraid
 
 An [Unraid Community Applications](https://github.com/mcreekmore/unraid-templates/blob/main/cross-seed-cleanup/cross-seed-cleanup.xml) template is included (`cross-seed-cleanup.xml`). Install via the Apps tab or add the template manually.
