@@ -87,7 +87,10 @@ func Run() {
 	var fileInfoErrors int
 	for i, torrent := range torrents {
 		if (i+1)%500 == 0 || i+1 == len(torrents) {
-			fmt.Fprintf(out, "  Fetching file info %d/%d...\r", i+1, len(torrents))
+			_, err = fmt.Fprintf(out, "  Fetching file info %d/%d...\r", i+1, len(torrents))
+			if err != nil {
+				slog.Error("failed to format print", "err", err)
+			}
 		}
 		files, err := client.GetFilesInformation(torrent.Hash)
 		if err != nil {
@@ -97,7 +100,10 @@ func Run() {
 		}
 		torrentFiles[torrent.Hash] = files
 	}
-	fmt.Fprintln(out)
+	_, err = fmt.Fprintln(out)
+	if err != nil {
+		slog.Error("failed to format print", "err", err)
+	}
 	if fileInfoErrors > 0 {
 		slog.Warn("could not fetch file info for some torrents", "count", fileInfoErrors)
 	}
@@ -128,11 +134,23 @@ func Run() {
 		"skipped", len(skippedTorrents),
 	)
 
-	fmt.Fprintf(out, "\n%s\n", strings.Repeat("=", 60))
-	fmt.Fprintf(out, "  Externally linked (KEEP):        %d\n", len(kept))
-	fmt.Fprintf(out, "  Cross-seed only (REMOVABLE):     %d\n", len(removable))
-	fmt.Fprintf(out, "  No accessible files (SKIPPED):   %d\n", len(skippedTorrents))
-	fmt.Fprintf(out, "%s\n", strings.Repeat("=", 60))
+	_, err = fmt.Fprintf(out, "\n%s\n", strings.Repeat("=", 60))
+	if err != nil {
+		slog.Error("failed to format print", "err", err)
+	}
+	_, err = fmt.Fprintf(out, "  Externally linked (KEEP):        %d\n", len(kept))
+	if err != nil {
+		slog.Error("failed to format print", "err", err)
+	}
+	_, err = fmt.Fprintf(out, "  Cross-seed only (REMOVABLE):     %d\n", len(removable))
+	if err != nil {
+		slog.Error("failed to format print", "err", err)
+	}
+	_, err = fmt.Fprintf(out, "  No accessible files (SKIPPED):   %d\n", len(skippedTorrents))
+	if err != nil {
+		slog.Error("failed to format print", "err", err)
+	}
+	_, err = fmt.Fprintf(out, "%s\n", strings.Repeat("=", 60))
 
 	if len(removable) == 0 {
 		fmt.Fprintln(out, "\nAll torrents with files are externally linked. Nothing to tag.")
