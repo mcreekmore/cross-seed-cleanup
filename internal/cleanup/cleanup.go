@@ -87,10 +87,7 @@ func Run() {
 	var fileInfoErrors int
 	for i, torrent := range torrents {
 		if (i+1)%500 == 0 || i+1 == len(torrents) {
-			_, err = fmt.Fprintf(out, "  Fetching file info %d/%d...\r", i+1, len(torrents))
-			if err != nil {
-				slog.Error("failed to format print", "err", err)
-			}
+			slog.Debug("fetching file info", "progress", i+1, "total", len(torrents))
 		}
 		files, err := client.GetFilesInformation(torrent.Hash)
 		if err != nil {
@@ -99,10 +96,6 @@ func Run() {
 			continue
 		}
 		torrentFiles[torrent.Hash] = files
-	}
-	_, err = fmt.Fprintln(out)
-	if err != nil {
-		slog.Error("failed to format print", "err", err)
 	}
 	if fileInfoErrors > 0 {
 		slog.Warn("could not fetch file info for some torrents", "count", fileInfoErrors)
@@ -134,30 +127,10 @@ func Run() {
 		"skipped", len(skippedTorrents),
 	)
 
-	_, err = fmt.Fprintf(out, "\n%s\n", strings.Repeat("=", 60))
-	if err != nil {
-		slog.Error("failed to format print", "err", err)
-	}
-	_, err = fmt.Fprintf(out, "  Externally linked (KEEP):        %d\n", len(kept))
-	if err != nil {
-		slog.Error("failed to format print", "err", err)
-	}
-	_, err = fmt.Fprintf(out, "  Cross-seed only (REMOVABLE):     %d\n", len(removable))
-	if err != nil {
-		slog.Error("failed to format print", "err", err)
-	}
-	_, err = fmt.Fprintf(out, "  No accessible files (SKIPPED):   %d\n", len(skippedTorrents))
-	if err != nil {
-		slog.Error("failed to format print", "err", err)
-	}
-	_, err = fmt.Fprintf(out, "%s\n", strings.Repeat("=", 60))
-
 	if len(removable) == 0 {
-		fmt.Fprintln(out, "\nAll torrents with files are externally linked. Nothing to tag.")
+		slog.Info("all torrents with files are externally linked, nothing to tag")
 		return
 	}
-
-	fmt.Fprintln(out, "\nRemovable torrents (no external hardlinks):")
 
 	sort.Slice(removable, func(i, j int) bool {
 		return removable[i].Size > removable[j].Size
@@ -165,15 +138,15 @@ func Run() {
 
 	for _, t := range removable {
 		sizeGiB := float64(t.Size) / (1024 * 1024 * 1024)
-		cat := ""
-		if t.Category != "" {
-			cat = fmt.Sprintf("[%s]", t.Category)
-		}
-		fmt.Fprintf(out, "  %8.2f GiB  %-20s  %s\n", sizeGiB, cat, t.Name)
+		slog.Info("removable torrent",
+			"size_gib", fmt.Sprintf("%.2f", sizeGiB),
+			"category", t.Category,
+			"name", t.Name,
+		)
 	}
 
 	totalGiB := float64(result.ReclaimableBytes) / (1024 * 1024 * 1024)
-	fmt.Fprintf(out, "\n  Total reclaimable: %.2f GiB\n", totalGiB)
+	slog.Info("reclaimable space", "total_gib", fmt.Sprintf("%.2f", totalGiB))
 
 	if !dryRun {
 		hashes := make([]string, len(removable))
