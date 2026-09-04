@@ -61,8 +61,17 @@ Set `DRY_RUN=false` to apply tags.
 | `DRY_RUN`            | `true`            | No       | Report only; set `false` to apply tags                  |
 | `SCHEDULE`           |                   | No       | Cron expression for recurring runs (e.g. `0 */6 * * *`) |
 | `RUN_ON_START`       | `true`            | No       | Run immediately before entering cron schedule           |
+| `LOG_LEVEL`          | `info`            | No       | Log verbosity: `debug`, `info`, `warn`, or `error`      |
+| `LOG_FILE`           |                   | No       | Append report and logs to this file (in addition to stdout) |
 
 \* Provide either `QB_PASSWORD` (with `QB_USERNAME`) or `QB_API_KEY`, not both.
+
+### Volumes
+
+| Container Path | Mode | Description                                                                     |
+| -------------- | ---- | ------------------------------------------------------------------------------- |
+| `/data`        | `ro` | Torrent data. Must match the paths qBittorrent uses.                            |
+| `/logs`        | `rw` | Optional. Folder for log files; point `LOG_FILE` here (e.g. `/logs/cross-seed-cleanup.log`) to persist logs. |
 
 ## Unraid
 
