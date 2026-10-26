@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 
 	"github.com/robfig/cron/v3"
@@ -35,12 +36,14 @@ func main() {
 	if runOnStart {
 		slog.Info("executing initial run")
 		cleanup.Run()
+		debug.FreeOSMemory()
 	}
 
 	c := cron.New()
 	_, err := c.AddFunc(schedule, func() {
 		slog.Info("scheduled run starting")
 		cleanup.Run()
+		debug.FreeOSMemory()
 		slog.Info("scheduled run complete")
 	})
 	if err != nil {
