@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM cgr.dev/chainguard/go:latest AS builder
 
 WORKDIR /app
 
@@ -9,8 +9,8 @@ COPY *.go ./
 COPY internal/ ./internal/
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /cross-seed-cleanup
 
-FROM alpine:3.21
+FROM gcr.io/distroless/static-debian13
 
 COPY --from=builder /cross-seed-cleanup /cross-seed-cleanup
-
+USER nonroot:nonroot
 ENTRYPOINT ["/cross-seed-cleanup"]
