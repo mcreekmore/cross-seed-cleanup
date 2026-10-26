@@ -82,3 +82,24 @@ An [Unraid Community Applications](https://github.com/mcreekmore/unraid-template
 1. **Stat** - Retrieves all torrents from qBittorrent and stats each file to collect inode/hardlink data.
 2. **Classify** - Compares each file's hardlink count (`nlink`) against the number of torrents referencing the same inode. Files with external hardlinks are kept.
 3. **Tag** - Torrents with no externally linked files are tagged as removable for bulk deletion in qBittorrent.
+
+## Deleting Tagged Torrents
+
+cross-seed-cleanup only tags torrents. It never deletes anything, so removal is left to whatever already manages your qBittorrent instance. With [qbit_manage](https://github.com/StuffAnThings/qbit_manage), add a share limit group that matches the tag and has `cleanup` turned on:
+
+```yaml
+commands:
+  share_limits: true # or QBT_SHARE_LIMITS=true / --share-limits
+
+share_limits:
+  cross-seed-only:
+    priority: 1 # groups match in priority order, so keep this lower than your other groups
+    include_all_tags:
+      - cross-seed-only # must match your TAG_REMOVABLE value
+    max_seeding_time: 1m
+    cleanup: true
+```
+
+`cleanup: true` removes the torrent and deletes its files once it hits a limit, and `max_seeding_time: 1m` makes that true for any tagged torrent. If you want a grace period, raise `max_seeding_time` or set `MIN_AGE_DAYS` here instead.
+
+Run qbit_manage with `dry_run: true` first to see what it would remove. Its [recycle bin](https://github.com/StuffAnThings/qbit_manage/wiki/Config-Setup#recyclebin) is also worth enabling so deleted files can be recovered for a while. See the [share_limits docs](https://github.com/StuffAnThings/qbit_manage/wiki/Config-Setup#share_limits) for the other options.
